@@ -1,0 +1,54 @@
+import argparse
+
+from pathlib import Path
+import sys
+
+import pytest
+
+
+def mosaico_testing():
+    """
+    Console script entry point.
+    Parses arguments, sets up configuration, and initiates the injector.
+    """
+    parser = argparse.ArgumentParser(description="Run pytest on mosaico SDK.")
+
+    # Required Arguments
+    parser.add_argument(
+        "-k",
+        "--keyword",
+        help="Only run tests matching keyword expression (same as pytest -k).",
+    )
+    parser.add_argument("-q", "--quiet", action="store_true", help="Quiet mode.")
+
+    # Connection Arguments
+    parser.add_argument("-vv", action="store_true", help="Very-verbose")
+    parser.add_argument(
+        "-l",
+        "--log",
+        choices=["debug", "info", "warning", "error", "critical"],
+        help="Enable logging with level.",
+    )
+
+    args = parser.parse_args()
+
+    src_dir = Path(__file__).resolve().parent
+    pytest_args = [str(src_dir)]
+
+    if args.keyword:
+        pytest_args += ["-k", args.keyword]
+
+    if not args.quiet:
+        pytest_args.append("-v")
+
+    if args.vv:
+        pytest_args.append("-vv")
+    if args.log:
+        pytest_args += ["--log-cli-level", args.log.upper()]
+
+    # run pytest; sys.exit ensures exit code is propagated
+    sys.exit(pytest.main(pytest_args))
+
+
+if __name__ == "__main__":
+    mosaico_testing()

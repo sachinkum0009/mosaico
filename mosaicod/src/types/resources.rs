@@ -1,0 +1,213 @@
+use crate::{params, rw, traits};
+use std::path;
+
+pub struct ResourceId {
+    pub id: i32,
+    pub uuid: uuid::Uuid,
+}
+
+pub enum ResourceType {
+    Sequence,
+    Topic,
+}
+
+#[derive(Clone)]
+pub struct TopicResourceLocator(String);
+
+impl Resource for TopicResourceLocator {
+    fn name(&self) -> &String {
+        &self.0
+    }
+
+    fn resource_type(&self) -> ResourceType {
+        ResourceType::Topic
+    }
+}
+
+impl<T> From<T> for TopicResourceLocator
+where
+    T: AsRef<path::Path>,
+{
+    fn from(value: T) -> Self {
+        Self(sanitize_name(&value.as_ref().to_string_lossy()))
+    }
+}
+
+impl std::fmt::Display for TopicResourceLocator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[topic|{}]", self.0)
+    }
+}
+
+impl From<TopicResourceLocator> for String {
+    fn from(value: TopicResourceLocator) -> Self {
+        value.0
+    }
+}
+
+#[derive(Debug)]
+pub struct TopicMetadata<M> {
+    pub properties: TopicProperties,
+    pub user_metadata: M,
+}
+
+impl<M> TopicMetadata<M> {
+    pub fn new(props: TopicProperties, user_metadata: M) -> Self
+    where
+        M: super::MetadataBlob,
+    {
+        Self {
+            properties: props,
+            user_metadata,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct TopicProperties {
+    pub serialization_format: rw::Format,
+    pub ontology_tag: String,
+}
+
+impl TopicProperties {
+    pub fn new(serialization_format: rw::Format, ontology_tag: String) -> Self {
+        Self {
+            serialization_format,
+            ontology_tag,
+        }
+    }
+}
+
+pub struct TopicSystemInfo {
+    /// Number of chunks in the topic
+    pub chunks_number: usize,
+    /// True is the topic is currently locked, a topic is locked if
+    /// some data was uploaded and the connection was closed gracefully
+    pub is_locked: bool,
+    /// Total size in bytes of the data.
+    /// Metadata and other system files are excluded in the count.
+    pub total_size_bytes: usize,
+    /// Datetime of the topic creation
+    pub created_datetime: super::DateTime,
+}
+
+#[derive(Clone)]
+pub struct SequenceResourceLocator(String);
+
+impl Resource for SequenceResourceLocator {
+    fn name(&self) -> &String {
+        &self.0
+    }
+
+    fn resource_type(&self) -> ResourceType {
+        ResourceType::Sequence
+    }
+}
+
+impl<T> From<T> for SequenceResourceLocator
+where
+    T: AsRef<path::Path>,
+{
+    fn from(value: T) -> Self {
+        Self(sanitize_name(&value.as_ref().to_string_lossy()))
+    }
+}
+
+impl std::fmt::Display for SequenceResourceLocator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[sequence|{}]", self.0)
+    }
+}
+
+impl From<SequenceResourceLocator> for String {
+    fn from(value: SequenceResourceLocator) -> String {
+        value.0
+    }
+}
+
+pub struct SequenceMetadata<M>
+where
+    M: super::MetadataBlob,
+{
+    pub user_metadata: M,
+}
+
+impl<M> SequenceMetadata<M>
+where
+    M: super::MetadataBlob,
+{
+    pub fn new(user_metadata: M) -> Self {
+        Self { user_metadata }
+    }
+}
+
+pub struct SequenceSystemInfo {
+    /// Total size in bytes of the data.
+    /// This values includes additional system files.
+    pub total_size_bytes: usize,
+    /// True is the sequence is locked, a sequence is locked if
+    /// all its topics are locked and the `sequence_finalize` action
+    /// was called.
+    pub is_locked: bool,
+    /// Datetime of the sequence creation
+    pub created_datetime: super::DateTime,
+}
+
+pub type SequenceTopicGroup = (SequenceResourceLocator, Vec<TopicResourceLocator>);
+
+pub trait Resource: std::fmt::Display + Send + Sync {
+    fn name(&self) -> &String;
+
+    fn resource_type(&self) -> ResourceType;
+
+    /// Returns the location of the metadata file associated with the resource.
+    ///
+    /// The metadata file may or may not exists, no check if performed by this function.
+    fn metadata(&self) -> path::PathBuf {
+        let mut path = path::Path::new(self.name()).join("metadata");
+        path.set_extension(params::ext::JSON);
+        path
+    }
+
+    fn datafile(&self, chunk_number: usize, extension: &dyn traits::AsExtension) -> path::PathBuf {
+        let filename = format!("data-{:05}", chunk_number);
+        let mut path = path::Path::new(self.name()).join(filename);
+
+        path.set_extension(extension.as_extension());
+
+        path
+    }
+
+    fn is_sub_resource(&self, parent: &dyn Resource) -> bool {
+        self.name().starts_with(parent.name())
+    }
+}
+
+/// Returns a sanitized resource name by trimming whitespace and ensuring it does **not** start with a `/`.
+///
+/// This function is useful when normalizing resource paths or identifiers to ensure consistency
+/// across the application by making them relative paths.
+fn sanitize_name(name: &str) -> String {
+    let trimmed = name.trim();
+
+    if let Some(stripped) = trimmed.strip_prefix('/') {
+        stripped.to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resource_name() {
+        let target = "my/resource/name";
+        let san = sanitize_name("/my/resource/name");
+        assert_eq!(san, target);
+
+        let san = sanitize_name("    my/resource/name   ");
+        assert_eq!(san, target);
+    }
+}

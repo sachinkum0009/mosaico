@@ -1,0 +1,39 @@
+[tool.poetry]
+name = "mosaico-sdk-py"
+version = "0.1.0"
+description = "SDK for Mosaico Data-Platform"
+authors = ["Mosaico Labs <info@mosaico.com>"]
+
+packages = [{ include = "mosaicolabs", from = "src" }]
+
+[tool.poetry.dependencies]
+python = ">=3.13,<4"
+pyarrow = ">=22.0.0"
+numpy = ">=2.0.0,<2.3.0"
+pyarrow-stubs = ">=20.0.0.20250928,<21.0.0.0"
+pillow = ">=11.3.0,<12.0.0"
+pandas = ">=2.3.3,<3.0.0"
+pydantic = "^2.12.0"
+rich = "^14.2.0"
+rosbags = "^0.11.0"
+click = "^8.3.0"
+opencv-python = "^4.12.0.88"
+av = "^16.0.1"
+
+[tool.poetry.group.dev.dependencies]
+pyqt5 = "^5.15.11"
+pyqt5-qt5 = "^5.15.17"
+pytest = ">=8.4.2"
+
+
+# ROS 1/2 messages (sensor_msgs) are typically system packages, but for development/testing 
+# you might need a Python wrapper, e.g., rosidl_runtime_py or a specific wrapper 
+# for sensor_msgs if you can't rely on the user's sourced ROS environment.
+# Since you're using rosbags, relying on its abilities to read ROS messages is the standard approach.
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+"mosaicolabs.ros_injector" = "mosaicolabs.ros_bridge.injector:ros_injector"
+"mosaicolabs.testing" = "testing.testing:mosaico_testing"

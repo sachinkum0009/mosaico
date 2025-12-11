@@ -1,0 +1,18 @@
+name: "mosaico-testing"
+services:
+  database:
+    image: postgres:16
+    container_name: db-testing
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: mosaico
+    ports:
+      - "6543:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+
+volumes:
+  postgres_data:
+

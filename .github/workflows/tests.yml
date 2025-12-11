@@ -1,0 +1,60 @@
+name: tests
+
+on:
+  push:
+    branches:
+      - "main"
+    paths:
+      - '**.rs'
+      - '**.py'
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+      - '**/pyproject.toml'
+      - '**/poetry.lock'
+  workflow_dispatch:
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+
+    env:
+      PYTHON_KEYRING_BACKEND: keyring.backends.null.Keyring
+      
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "mosaicod -> target"
+          cache-targets: true
+          cache-on-failure: true
+
+      - name: mosaicod Linter
+        run: |
+          cd mosaicod
+          cargo clippy --no-deps --all-targets --all-features -- -D warnings
+
+      - name: Install System Deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpq-dev
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install Poetry
+        run: pipx install poetry
+
+      # 5. Execute the Test Suite Script
+      - name: Run Test Suite
+        run: |
+          ./scripts/test_suite.sh
